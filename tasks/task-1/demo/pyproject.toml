@@ -1,0 +1,123 @@
+[project]
+name = "ocr-batch-processor"
+version = "0.1.0"
+description = "High-volume batch OCR processing demo with CPU/GPU flexibility"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    # Core dependencies (work with both CPU and GPU)
+    "opencv-python>=4.8.0",
+    "opencv-python-headless>=4.8.0",
+    "pillow>=10.0.0",
+    "numpy>=1.24.0,<2.0.0",
+    "pandas>=2.0.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "tqdm>=4.66.0",
+    "psutil>=5.9.0",
+    "python-Levenshtein>=0.21.0",
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+    "tabulate>=0.9.0",
+    "jinja2>=3.1.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+# CPU-only configuration (default) - Keep current working versions
+cpu = [
+    "easyocr>=1.7.0",
+    "opencv-python>=4.8.0",
+    "torch>=2.0.0,<2.3.0; sys_platform == 'linux'",
+    "torchvision>=0.15.0,<0.18.0; sys_platform == 'linux'",
+]
+
+# PaddleOCR optional (separate due to compatibility issues)
+paddle = [
+    "paddlepaddle>=2.6.1",
+    "paddleocr>=2.7.0",
+    "paddlex>=3.0.0",
+]
+
+# GPU configuration (for future use)
+gpu = [
+    "easyocr>=1.7.0",
+    "torch>=2.0.0,<2.3.0",
+    "torchvision>=0.15.0,<0.18.0",
+    "nvidia-ml-py>=12.0.0",
+]
+
+# Advanced GPU models (future expansion)
+advanced = [
+    # Placeholder for OLMoCR and other advanced models
+    # "olmocr @ git+https://github.com/allenai/olmocr.git",
+    # "transformers>=4.35.0",
+    # "accelerate>=0.25.0",
+]
+
+# Development dependencies
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "ipython>=8.15.0",
+    "jupyter>=1.0.0",
+    "notebook>=7.0.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "myst-parser>=2.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+    "W191",  # indentation contains tabs
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+no_implicit_optional = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = [
+    "tests",
+]
+python_files = "test_*.py"

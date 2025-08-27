@@ -1,0 +1,1 @@
+Review the code in the demo/ subdirectory. Focus on issues like incorrect logic inside of functions, tests that do not test anything, and places where the code deviates from steps 1-14 in the to-do document. DO NOT CHANGE any code during this review. Simple create a markdown document that outlines all the issues that you have found.

@@ -1,0 +1,105 @@
+# OCR Batch Processing Configuration File
+# This file contains all configurable parameters for the OCR batch processing demo
+
+# Processing Configuration
+processing:
+  device: "auto"  # auto, cpu, gpu
+  num_workers: null  # null for auto-detection
+  batch_size: 10
+  timeout: 30  # seconds per document
+  max_retries: 3
+  gpu_memory_limit: 0.8
+  enable_progress: true
+  enable_monitoring: true
+
+# OCR Model Configuration
+ocr_model:
+  name: "easyocr"  # easyocr, paddleocr
+  languages: ["en"]
+  gpu: false  # Will be overridden by processing.device
+
+# Dataset Configuration
+dataset:
+  data_dir: "data/funsd_subset"
+  num_documents: 100
+  skip_download: false
+  validation_enabled: true
+
+# Evaluation Configuration
+evaluation:
+  normalize_text: true
+  lowercase: true
+  remove_punctuation: false
+  calculate_correlations: true
+
+# Cost Analysis Configuration
+cost_analysis:
+  hardware_costs:
+    cpu_cost: 500.0
+    gpu_cost: 1200.0
+    memory_cost: 200.0
+    storage_cost: 100.0
+    other_components: 300.0
+    cpu_lifespan_years: 4.0
+    gpu_lifespan_years: 3.0
+    memory_lifespan_years: 5.0
+    storage_lifespan_years: 5.0
+    other_lifespan_years: 5.0
+  
+  power_consumption:
+    cpu_idle_watts: 15.0
+    cpu_load_watts: 65.0
+    gpu_idle_watts: 15.0
+    gpu_load_watts: 150.0
+    memory_watts: 10.0
+    storage_watts: 5.0
+    motherboard_watts: 20.0
+    electricity_cost_kwh: 0.12
+  
+  cloud_costs:
+    google_vision_per_1k: 1.50
+    aws_textract_per_1k: 1.50
+    azure_vision_per_1k: 1.00
+    azure_forms_per_1k: 10.00
+
+# System Monitoring Configuration
+monitoring:
+  log_dir: "logs"
+  sampling_interval: 1.0  # seconds
+  enable_gpu_monitoring: true
+  enable_nvml: true
+
+# Reporting Configuration
+reporting:
+  output_dir: "results"
+  generate_html: true
+  generate_csv: true
+  generate_plots: true
+  generate_executive_summary: true
+  plot_dpi: 300
+  plot_style: "seaborn-v0_8"
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_file: null  # null for auto-generated timestamp file
+  console_output: true
+  file_output: true
+  external_lib_level: "WARNING"  # Level for matplotlib, PIL, etc.
+
+# Error Handling Configuration
+error_handling:
+  max_retries: 3
+  base_delay: 1.0
+  max_delay: 60.0
+  backoff_factor: 2.0
+  error_log_retention_days: 30
+  enable_graceful_shutdown: true
+
+# Performance Optimization
+performance:
+  enable_multiprocessing: false  # Use threading instead for OCR models
+  memory_limit_gb: null  # null for no limit
+  disk_space_threshold_gb: 1.0
+  cpu_threshold: 0.95
+  memory_threshold: 0.9

@@ -1,0 +1,75 @@
+# GPU Configuration for OCR Batch Processing
+# Optimized for GPU-accelerated execution
+
+# Processing Configuration
+device: "gpu"
+num_workers: 2  # Fewer workers for GPU processing
+batch_size: 16  # Larger batches for GPU efficiency
+timeout: 30  # Faster processing expected with GPU
+
+# GPU Memory Management
+gpu_memory_limit: 0.8  # Use 80% of GPU memory
+gpu_memory_growth: true  # Allow dynamic memory allocation
+
+# OCR Model Settings
+model:
+  type: "easyocr"
+  languages: ["en"]
+  gpu: true
+  quantize: false  # Full precision on GPU
+  
+  # EasyOCR specific settings for GPU optimization
+  easyocr:
+    canvas_size: 2560  # Larger canvas for better quality
+    mag_ratio: 1.2
+    text_threshold: 0.6  # More sensitive detection
+    low_text: 0.3
+    link_threshold: 0.3
+    width_ths: 0.4
+    height_ths: 0.4
+    batch_size: 4  # GPU batch size
+
+# Dataset Configuration
+dataset:
+  num_documents: 500  # Process more documents with GPU
+  data_dir: "data/funsd_subset"
+  skip_validation: false
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  sampling_interval: 1.0  # More frequent sampling for GPU
+  memory_threshold: 0.80
+  cpu_threshold: 0.80
+  gpu_memory_threshold: 0.85
+  gpu_utilization_threshold: 0.90
+
+# Error Handling
+error_handling:
+  max_retries: 2  # Fewer retries for GPU (faster failure detection)
+  base_delay: 0.5
+  enable_recovery: true
+  log_level: "INFO"
+  gpu_error_recovery: true
+
+# Output Configuration
+output:
+  generate_reports: true
+  save_plots: true
+  create_html_report: true
+  create_csv_summary: true
+
+# Cost Analysis
+cost_analysis:
+  electricity_cost_per_kwh: 0.12
+  cpu_cost: 500.0
+  gpu_cost: 1200.0
+  memory_cost: 200.0
+  cpu_lifespan_years: 4.0
+  gpu_lifespan_years: 3.0
+
+# Performance Optimization
+performance:
+  enable_mixed_precision: true
+  optimize_for_inference: true
+  clear_cache_frequency: 50  # Clear GPU cache every N documents
