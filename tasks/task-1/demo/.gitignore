@@ -85,12 +85,10 @@ Thumbs.db
 # OCR specific - Data and logs directories
 data/
 logs/
-results/
 
 # Keep directory structure files
 !data/.gitkeep
 !logs/.gitkeep
-!results/.gitkeep
 
 # Model cache
 .easyocr/
