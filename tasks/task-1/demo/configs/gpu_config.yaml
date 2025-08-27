@@ -2,74 +2,147 @@
 # Optimized for GPU-accelerated execution
 
 # Processing Configuration
-device: "gpu"
-num_workers: 2  # Fewer workers for GPU processing
-batch_size: 16  # Larger batches for GPU efficiency
-timeout: 30  # Faster processing expected with GPU
+processing:
+  device: "gpu"
+  num_workers: 2  # Fewer workers for GPU processing
+  batch_size: 16  # Larger batches for GPU efficiency
+  timeout: 30  # Faster processing expected with GPU
+  max_retries: 2
+  gpu_memory_limit: 0.8  # Use 80% of GPU memory
+  enable_progress: true
+  enable_monitoring: true
 
-# GPU Memory Management
-gpu_memory_limit: 0.8  # Use 80% of GPU memory
-gpu_memory_growth: true  # Allow dynamic memory allocation
+# Pipeline Configuration
+pipeline:
+  # Image Transform Pipeline Settings (GPU optimized)
+  image_transform:
+    batch_size: 16  # Larger batch for GPU efficiency
+    num_workers: 2  # Fewer workers needed with GPU
+    use_processes: false  # Use threads
+    timeout: 30.0
+    
+    # Image Quality Settings (enabled for GPU power)
+    quality_enhancement: true  # Enabled for better quality
+    normalize: true  # Enabled for better quality
+    grayscale_conversion: false
+    resize_images: false
+    target_size: null
+    max_image_size: [2560, 2560]  # Larger max size for GPU
+    
+    # Advanced Transform Settings  
+    gaussian_blur: null
+    adaptive_threshold: false
+    
+  # OCR Reader Settings (GPU optimized)
+  ocr_reader:
+    device: "gpu"
+    batch_size: 4  # GPU can handle larger batches
+    confidence_threshold: 0.1
+    timeout_per_image: 30.0
+    model_kwargs:
+      # EasyOCR GPU optimization parameters
+      canvas_size: 2560
+      mag_ratio: 1.2
+      text_threshold: 0.6
+      low_text: 0.3
+      link_threshold: 0.3
+      width_ths: 0.4
+      height_ths: 0.4
+    
+  # Pipeline Coordination Settings
+  coordination:
+    enable_continuous_processing: true
+    max_buffer_refill_workers: 1
+    stats_update_interval: 2.0  # More frequent updates for GPU
 
-# OCR Model Settings
-model:
-  type: "easyocr"
+# OCR Model Configuration
+ocr_model:
+  name: "easyocr"
   languages: ["en"]
   gpu: true
-  quantize: false  # Full precision on GPU
-  
-  # EasyOCR specific settings for GPU optimization
-  easyocr:
-    canvas_size: 2560  # Larger canvas for better quality
-    mag_ratio: 1.2
-    text_threshold: 0.6  # More sensitive detection
-    low_text: 0.3
-    link_threshold: 0.3
-    width_ths: 0.4
-    height_ths: 0.4
-    batch_size: 4  # GPU batch size
 
 # Dataset Configuration
 dataset:
-  num_documents: 500  # Process more documents with GPU
   data_dir: "data/funsd_subset"
-  skip_validation: false
+  num_documents: 500  # Process more documents with GPU
+  skip_download: false
+  validation_enabled: true
 
-# Monitoring Configuration
+# Evaluation Configuration
+evaluation:
+  normalize_text: true
+  lowercase: true
+  remove_punctuation: false
+  calculate_correlations: true
+
+# Cost Analysis Configuration
+cost_analysis:
+  hardware_costs:
+    cpu_cost: 500.0
+    gpu_cost: 1200.0
+    memory_cost: 200.0
+    storage_cost: 100.0
+    other_components: 300.0
+    cpu_lifespan_years: 4.0
+    gpu_lifespan_years: 3.0
+    memory_lifespan_years: 5.0
+    storage_lifespan_years: 5.0
+    other_lifespan_years: 5.0
+  
+  power_consumption:
+    cpu_idle_watts: 15.0
+    cpu_load_watts: 65.0
+    gpu_idle_watts: 15.0
+    gpu_load_watts: 250.0  # Higher power for GPU
+    memory_watts: 10.0
+    storage_watts: 5.0
+    motherboard_watts: 20.0
+    electricity_cost_kwh: 0.12
+  
+  cloud_costs:
+    google_vision_per_1k: 1.50
+    aws_textract_per_1k: 1.50
+    azure_vision_per_1k: 1.00
+    azure_forms_per_1k: 10.00
+
+# System Monitoring Configuration
 monitoring:
-  enabled: true
+  log_dir: "logs"
   sampling_interval: 1.0  # More frequent sampling for GPU
-  memory_threshold: 0.80
-  cpu_threshold: 0.80
-  gpu_memory_threshold: 0.85
-  gpu_utilization_threshold: 0.90
+  enable_gpu_monitoring: true
+  enable_nvml: true
 
-# Error Handling
+# Reporting Configuration
+reporting:
+  output_dir: "results"
+  generate_html: true
+  generate_csv: true
+  generate_plots: true
+  generate_executive_summary: true
+  plot_dpi: 300
+  plot_style: "seaborn-v0_8"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: null
+  console_output: true
+  file_output: true
+  external_lib_level: "WARNING"
+
+# Error Handling Configuration
 error_handling:
   max_retries: 2  # Fewer retries for GPU (faster failure detection)
   base_delay: 0.5
-  enable_recovery: true
-  log_level: "INFO"
-  gpu_error_recovery: true
-
-# Output Configuration
-output:
-  generate_reports: true
-  save_plots: true
-  create_html_report: true
-  create_csv_summary: true
-
-# Cost Analysis
-cost_analysis:
-  electricity_cost_per_kwh: 0.12
-  cpu_cost: 500.0
-  gpu_cost: 1200.0
-  memory_cost: 200.0
-  cpu_lifespan_years: 4.0
-  gpu_lifespan_years: 3.0
+  max_delay: 30.0
+  backoff_factor: 2.0
+  error_log_retention_days: 30
+  enable_graceful_shutdown: true
 
 # Performance Optimization
 performance:
-  enable_mixed_precision: true
-  optimize_for_inference: true
-  clear_cache_frequency: 50  # Clear GPU cache every N documents
+  enable_multiprocessing: false
+  memory_limit_gb: null
+  disk_space_threshold_gb: 1.0
+  cpu_threshold: 0.80
+  memory_threshold: 0.80

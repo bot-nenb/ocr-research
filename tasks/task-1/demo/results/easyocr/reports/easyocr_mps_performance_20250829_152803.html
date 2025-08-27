@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>easyocr Apple Silicon (MPS) Performance Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+        
+        .device-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            margin: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .timestamp {
+            color: #6c757d;
+            margin-top: 1rem;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .metric-card h2 {
+            font-size: 1.3rem;
+            color: #4a5568;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .metric-value {
+            font-size: 3rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            color: #718096;
+            font-size: 1rem;
+        }
+        
+        .metric-subvalue {
+            font-size: 1.2rem;
+            color: #2d3748;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .chart-title {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+        }
+        
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 200px;
+            gap: 2px;
+            margin-bottom: 1rem;
+        }
+        
+        .bar {
+            flex: 1;
+            min-width: 10px;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 3px 3px 0 0;
+            position: relative;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        
+        .bar:hover {
+            opacity: 0.8;
+        }
+        
+        .bar-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 0.3rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .bar:hover .bar-tooltip {
+            opacity: 1;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+        
+        .stats-table {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .stats-table h2 {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            color: #2d3748;
+        }
+        
+        tr:hover {
+            background: #f7fafc;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e2e8f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .gpu-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .gpu-metric {
+            text-align: center;
+            padding: 1rem;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+        
+        .gpu-metric-label {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 0.5rem;
+        }
+        
+        .gpu-metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2d3748;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 3rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍎 easyocr Performance Report</h1>
+            <div class="device-badge">Apple Silicon (MPS)</div>
+            <div class="timestamp">Report Generated: 2025-08-29 15:28:03</div>
+        </div>
+        
+        <!-- Key Performance Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h2>⚡ Throughput</h2>
+                <div class="metric-value">43.8</div>
+                <div class="metric-label">Documents per minute</div>
+                <div class="metric-subvalue">0.73 docs/sec</div>
+            </div>
+            
+            <div class="metric-card">
+                <h2>⏱️ Processing Time</h2>
+                <div class="metric-value">1.37s</div>
+                <div class="metric-label">Average per document</div>
+                <div class="metric-subvalue">Total: 137.1s</div>
+            </div>
+            
+            <div class="metric-card">
+                <h2>📊 Success Rate</h2>
+                <div class="metric-value">100.0%</div>
+                <div class="metric-label">100 of 100 documents</div>
+                <div class="metric-subvalue">0 failed</div>
+            </div>
+        </div>
+        
+        <!-- GPU Utilization Metrics -->
+        <div class="metric-card">
+            <h2>🎮 GPU Resource Utilization</h2>
+            <div class="gpu-metrics">
+                <div class="gpu-metric">
+                    <div class="gpu-metric-label">GPU Usage</div>
+                    <div class="gpu-metric-value">47.8%</div>
+                </div>
+                <div class="gpu-metric">
+                    <div class="gpu-metric-label">Memory Usage</div>
+                    <div class="gpu-metric-value">0.5%</div>
+                </div>
+                <div class="gpu-metric">
+                    <div class="gpu-metric-label">Memory Used</div>
+                    <div class="gpu-metric-value">169 MB</div>
+                </div>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 47.79529999999999%">
+                    GPU: 47.8%
+                </div>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0.5155158519744873%">
+                    Memory: 0.5%
+                </div>
+            </div>
+        </div>
+        
+        <!-- Processing Time Distribution -->
+        <div class="chart-container">
+            <h2 class="chart-title">Processing Time Distribution</h2>
+            <div class="bar-chart" id="timeChart"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(to top, #667eea, #764ba2);"></div>
+                    <span>Processing Time</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detailed Statistics Table -->
+        <div class="stats-table">
+            <h2>Detailed Performance Statistics</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Total Documents Processed</td>
+                        <td>100</td>
+                        <td>100 successful, 0 failed</td>
+                    </tr>
+                    <tr>
+                        <td>Average Processing Time</td>
+                        <td>1.371 seconds</td>
+                        <td>σ = 0.611s</td>
+                    </tr>
+                    <tr>
+                        <td>Min/Max Processing Time</td>
+                        <td>0.548s / 2.926s</td>
+                        <td>Range: 2.378s</td>
+                    </tr>
+                    <tr>
+                        <td>Throughput</td>
+                        <td>0.729 docs/sec</td>
+                        <td>43.8 docs/min</td>
+                    </tr>
+                    <tr>
+                        <td>GPU Utilization</td>
+                        <td>47.8%</td>
+                        <td>Min: 40.9%, Max: 100.0%</td>
+                    </tr>
+                    <tr>
+                        <td>GPU Memory Usage</td>
+                        <td>169 MB</td>
+                        <td>0.5% of 32768 MB</td>
+                    </tr>
+                    <tr>
+                        <td>System CPU Usage</td>
+                        <td>70.0%</td>
+                        <td>Cores: 0</td>
+                    </tr>
+                    <tr>
+                        <td>System Memory Usage</td>
+                        <td>42.3%</td>
+                        <td>0.0 GB of 0.0 GB</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Configuration Details -->
+        <div class="stats-table">
+            <h2>Configuration</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Model</td>
+                        <td>easyocr</td>
+                    </tr>
+                    <tr>
+                        <td>Device Type</td>
+                        <td>MPS</td>
+                    </tr>
+                    <tr>
+                        <td>Batch Size</td>
+                        <td>8</td>
+                    </tr>
+                    <tr>
+                        <td>Number of Workers</td>
+                        <td>2</td>
+                    </tr>
+                    <tr>
+                        <td>Image Enhancement</td>
+                        <td>Enabled</td>
+                    </tr>
+                    <tr>
+                        <td>Monitoring Duration</td>
+                        <td>108.3 seconds</td>
+                    </tr>
+                    <tr>
+                        <td>Samples Collected</td>
+                        <td>100</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="footer">
+            <p>Generated by OCR Performance Analysis System</p>
+            <p>easyocr on Apple Silicon (MPS)</p>
+        </div>
+    </div>
+    
+    <script>
+        // Processing time chart data
+        const chartData = {"processing_times": [2.212918996810913, 0.6980161666870117, 0.39806580543518066, 1.230607032775879, 0.6967129707336426, 1.3643369674682617, 0.9312701225280762, 1.426450252532959, 1.4527647495269775, 1.4511327743530273, 1.6338529586791992, 0.39544081687927246, 0.5768461227416992, 0.7212710380554199, 0.5189039707183838, 0.5704178810119629, 0.8914821147918701, 1.0972411632537842, 0.7650067806243896, 0.6372921466827393, 0.49405789375305176, 1.4687790870666504, 0.832514762878418, 0.6341679096221924, 0.394334077835083, 0.72383713722229, 1.1584501266479492, 1.1103670597076416, 0.4207727909088135, 0.21696090698242188, 0.7262091636657715, 0.44776082038879395, 1.00419020652771, 0.6407880783081055, 1.0190770626068115, 1.8789088726043701, 0.7084989547729492, 1.3432719707489014, 1.1456241607666016, 0.4035940170288086, 0.48029303550720215, 1.0831599235534668, 0.3883168697357178, 0.5331389904022217, 0.919395923614502, 1.284485101699829, 0.3872380256652832, 1.2697479724884033, 0.7311232089996338, 1.472360372543335], "transform_times": [0.3374779224395752, 0.2507648468017578, 0.2567481994628906, 0.2561509609222412, 0.2646913528442383, 1.4962172508239746, 0.2529289722442627, 0.25057291984558105, 0.24927592277526855, 0.256533145904541, 0.25636768341064453, 0.25263381004333496, 1.389676809310913, 0.2529618740081787, 0.25870633125305176, 0.752208948135376, 0.2708120346069336, 0.2500579357147217, 0.25737428665161133, 0.26942896842956543, 0.2891347408294678, 1.456813097000122, 0.2944350242614746, 0.93243408203125, 0.2779099941253662, 0.2726902961730957, 0.27030396461486816, 0.27116918563842773, 0.26957011222839355, 1.536773920059204, 0.2825160026550293, 0.7536959648132324, 0.2619192600250244, 0.2859656810760498, 0.2629988193511963, 0.2644648551940918, 0.2610650062561035, 1.4671740531921387, 0.2625279426574707, 0.7645387649536133, 0.273392915725708, 0.2805938720703125, 0.2791171073913574, 0.2752878665924072, 0.2665529251098633, 1.4740159511566162, 0.2813119888305664, 0.760922908782959, 0.27965688705444336, 0.28621602058410645]};
+        
+        // Create bar chart
+        const chart = document.getElementById('timeChart');
+        const maxTime = Math.max(...chartData.processing_times);
+        
+        chartData.processing_times.forEach((time, index) => {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.style.height = `${(time / maxTime) * 100}%`;
+            
+            const tooltip = document.createElement('div');
+            tooltip.className = 'bar-tooltip';
+            tooltip.textContent = `Doc ${index + 1}: ${time.toFixed(2)}s`;
+            bar.appendChild(tooltip);
+            
+            chart.appendChild(bar);
+        });
+    </script>
+</body>
+</html>

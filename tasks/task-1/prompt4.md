@@ -1,1 +1,0 @@
-Ok, now I want you to build step 6 from the to-do list that you created. Let me know if you get stuck and I can help. Remember that you should only use uv and not use pip. uv sync --extra dev --extra cpu --extra paddle will make sure that the environment is correct. And then uv run python ... will do the rest.

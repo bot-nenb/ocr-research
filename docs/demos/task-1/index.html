@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task 1: FUNSD Dataset Analysis - OCR Research</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .breadcrumb {
+            color: white;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .breadcrumb a {
+            color: white;
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 1.2rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card h2 {
+            color: #4a5568;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .card h3 {
+            color: #2d3748;
+            font-size: 1.2rem;
+            margin: 1rem 0 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .card ul {
+            list-style: none;
+        }
+        
+        .card li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f7fafc;
+        }
+        
+        .card a {
+            color: #667eea;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.3s ease;
+        }
+        
+        .card a:hover {
+            color: #764ba2;
+        }
+        
+        .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        
+        .header-icon {
+            width: 28px;
+            height: 28px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .stat {
+            background: #f7fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .image-link {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f7fafc;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+        
+        .image-link:hover {
+            transform: scale(1.05);
+        }
+        
+        .image-link img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        footer {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+        
+        footer a {
+            color: white;
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        /* Model selector styles */
+        .model-selector {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .model-selector label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+        
+        .model-dropdown {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            background-color: white;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+        
+        .model-dropdown:hover {
+            border-color: #764ba2;
+        }
+        
+        .model-dropdown:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        
+        .model-info {
+            margin-top: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .model-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+        
+        .easyocr-badge {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #1976d2;
+        }
+        
+        .paddleocr-badge {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #7b1fa2;
+        }
+        
+        .gpu-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: 1px solid #667eea;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+        }
+        
+        .performance-badge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: 1px solid #f093fb;
+            box-shadow: 0 2px 4px rgba(240, 147, 251, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="../..">← Back to OCR Research Project</a>
+        </div>
+        
+        <header>
+            <h1>🔍 Task 1: FUNSD Dataset Analysis</h1>
+            <p class="subtitle">Comparative Analysis of OCR Models on FUNSD Dataset</p>
+            
+            <!-- Model Selector -->
+            <div class="model-selector">
+                <label for="modelSelect">Select OCR Model:</label>
+                <select id="modelSelect" class="model-dropdown">
+                    <option value="paddleocr">PaddleOCR - High Accuracy</option>
+                    <option value="easyocr">EasyOCR - Fast Processing</option>
+                </select>
+                <div class="model-info" id="modelInfo">
+                    <strong>PaddleOCR:</strong> Offers superior accuracy with complex document layouts and better text detection capabilities. Ideal for scenarios where accuracy is paramount.
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h2>
+                    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Primary Reports
+                </h2>
+                <ul>
+                    <li>
+                        <a href="paddleocr_ocr_processing_report_20250829_100521.html">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v1a1 1 0 001 1h4a1 1 0 001-1v-1m3-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v6m0 0a2 2 0 002 2h8a2 2 0 002-2m-6-7h.01"></path>
+                            </svg>
+                            Comprehensive HTML Report
+                        </a>
+                    </li>
+                    <li>
+                        <a href="../../paddleocr_executive_summary.json">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Executive Summary (JSON)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="paddleocr_results_summary_20250829_100521.csv">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                            Results Summary (CSV)
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Performance Analysis
+                </h2>
+                <ul>
+                    <li>
+                        <a href="paddleocr_plots/performance_vs_accuracy.png">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Performance vs Accuracy
+                        </a>
+                    </li>
+                    <li>
+                        <a href="paddleocr_plots/processing_time_distribution.png">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Processing Time Distribution
+                        </a>
+                    </li>
+                    <li>
+                        <a href="paddleocr_plots/accuracy_analysis.png">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Accuracy Analysis
+                        </a>
+                    </li>
+                    <li>
+                        <a href="paddleocr_plots/cost_comparison.png">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Cost Comparison
+                        </a>
+                    </li>
+                    <li>
+                        <a href="paddleocr_plots/system_resources.png">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                            System Resources
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h2>
+                    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                    </svg>
+                    Raw Data
+                </h2>
+                <ul>
+                    <li>
+                        <a href="../../paddleocr_complete_results.json">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                            </svg>
+                            Complete Results (JSON)
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card full-width">
+                <h2>
+                    <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Sample OCR Visualizations
+                </h2>
+                <p style="color: #718096; margin-bottom: 1rem;">
+                    Visual overlays showing OCR detection results on sample images
+                </p>
+                <div class="image-grid">
+                    <a href="paddleocr_visualizations/0001239897_ocr_overlay.png" class="image-link">
+                        <img src="paddleocr_visualizations/0001239897_ocr_overlay.png" alt="OCR Overlay 1">
+                    </a>
+                    <a href="paddleocr_visualizations/0012947358_ocr_overlay.png" class="image-link">
+                        <img src="paddleocr_visualizations/0012947358_ocr_overlay.png" alt="OCR Overlay 2">
+                    </a>
+                    <a href="paddleocr_visualizations/0060302201_ocr_overlay.png" class="image-link">
+                        <img src="paddleocr_visualizations/0060302201_ocr_overlay.png" alt="OCR Overlay 3">
+                    </a>
+                    <a href="paddleocr_visualizations/01197604_ocr_overlay.png" class="image-link">
+                        <img src="paddleocr_visualizations/01197604_ocr_overlay.png" alt="OCR Overlay 4">
+                    </a>
+                    <a href="paddleocr_visualizations/0060308251_ocr_overlay.png" class="image-link">
+                        <img src="paddleocr_visualizations/0060308251_ocr_overlay.png" alt="OCR Overlay 5">
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>OCR Research Project - Task 1: FUNSD Dataset Analysis</p>
+            <p>View the <a href="https://github.com/bot-nenb/ocr-research">GitHub Repository</a></p>
+        </footer>
+    </div>
+    
+    <script>
+        // Model configurations
+        const modelConfigs = {
+            paddleocr: {
+                name: 'PaddleOCR',
+                description: '<strong>PaddleOCR:</strong> Offers superior accuracy with complex document layouts and better text detection capabilities. Ideal for scenarios where accuracy is paramount.',
+                reportPrefix: 'paddleocr_',
+                csvPrefix: 'paddleocr_results_summary_',
+                badge: '<span class="model-badge paddleocr-badge">PADDLEOCR</span>',
+                timestamp: '20250829_100521'
+            },
+            easyocr: {
+                name: 'EasyOCR',
+                description: '<strong>EasyOCR:</strong> Provides fast processing speeds with good accuracy. Best suited for high-volume batch processing where speed is critical.',
+                reportPrefix: 'easyocr_',
+                csvPrefix: 'easyocr_results_summary_',
+                badge: '<span class="model-badge easyocr-badge">EASYOCR</span>',
+                timestamp: '20250829_101452'
+            }
+        };
+        
+        // Store original links
+        let originalLinks = {};
+        
+        function initializeLinks() {
+            // Store original report links
+            const primaryReportsCard = document.querySelectorAll('.card')[0];
+            const reportLinks = primaryReportsCard.querySelectorAll('a');
+            
+            originalLinks.htmlReport = reportLinks[0].href;
+            originalLinks.csvReport = reportLinks[2].href;
+            
+            // Extract timestamps from original links
+            const htmlMatch = originalLinks.htmlReport.match(/(\d{8}_\d{6})\.html/);
+            const csvMatch = originalLinks.csvReport.match(/(\d{8}_\d{6})\.csv/);
+            
+            originalLinks.htmlTimestamp = htmlMatch ? htmlMatch[1] : '20250829_101452';
+            originalLinks.csvTimestamp = csvMatch ? csvMatch[1] : '20250829_101452';
+        }
+        
+        function updateModelDisplay(modelValue) {
+            const config = modelConfigs[modelValue];
+            const modelInfo = document.getElementById('modelInfo');
+            
+            // Update model info description
+            modelInfo.innerHTML = config.description;
+            
+            // Update report links
+            updateReportLinks(modelValue);
+        }
+        
+        function updateReportLinks(modelValue) {
+            const config = modelConfigs[modelValue];
+            const primaryReportsCard = document.querySelectorAll('.card')[0];
+            const reportLinks = primaryReportsCard.querySelectorAll('a');
+            
+            // Update HTML report link
+            const htmlReportLink = reportLinks[0];
+            let newHtmlReportName;
+            
+            // Handle GPU report differently due to different naming convention
+            if (modelValue === 'easyocr_gpu') {
+                newHtmlReportName = `${config.reportPrefix}${config.timestamp}.html`;
+            } else if (modelValue === 'easyocr_gpu_performance') {
+                newHtmlReportName = `${config.reportPrefix}${config.timestamp}.html`;
+            } else {
+                newHtmlReportName = `${config.reportPrefix}ocr_processing_report_${config.timestamp}.html`;
+            }
+            
+            // Check if model-specific report exists, otherwise use original
+            checkFileExists(newHtmlReportName).then(exists => {
+                if (exists) {
+                    htmlReportLink.href = newHtmlReportName;
+                } else {
+                    // Fall back to original report
+                    htmlReportLink.href = `ocr_processing_report_${config.timestamp}.html`;
+                }
+            });
+            
+            // Update CSV report link
+            const csvReportLink = reportLinks[2];
+            const newCsvReportName = `${config.csvPrefix}${config.timestamp}.csv`;
+            
+            checkFileExists(newCsvReportName).then(exists => {
+                if (exists) {
+                    csvReportLink.href = newCsvReportName;
+                } else {
+                    // Fall back to original report
+                    csvReportLink.href = `results_summary_${config.timestamp}.csv`;
+                }
+            });
+            
+            // Update executive summary link
+            const executiveSummaryLink = reportLinks[1];
+            const newExecutiveSummaryName = `../../${config.reportPrefix.slice(0, -1)}_executive_summary.json`;
+            
+            checkFileExists(newExecutiveSummaryName).then(exists => {
+                if (exists) {
+                    executiveSummaryLink.href = newExecutiveSummaryName;
+                } else {
+                    // Fall back to original executive summary
+                    executiveSummaryLink.href = '../../executive_summary.json';
+                }
+            });
+            
+            // Update visualization paths and complete results
+            updateVisualizationLinks(modelValue);
+            updateRawDataLinks(modelValue);
+        }
+        
+        function updateRawDataLinks(modelValue) {
+            const config = modelConfigs[modelValue];
+            const rawDataCard = document.querySelectorAll('.card')[2]; // Raw Data card
+            const completeResultsLink = rawDataCard.querySelector('a');
+            
+            // Update complete results link
+            const modelSpecificPath = `../../${config.reportPrefix.slice(0, -1)}_complete_results.json`;
+            completeResultsLink.href = modelSpecificPath;
+        }
+        
+        function updateVisualizationLinks(modelValue) {
+            const config = modelConfigs[modelValue];
+            const visualizationLinks = document.querySelectorAll('.image-grid a');
+            
+            visualizationLinks.forEach(link => {
+                const originalHref = link.getAttribute('href');
+                const filename = originalHref.split('/').pop();
+                
+                // Use model-specific visualization directory
+                const modelSpecificPath = `${config.reportPrefix}visualizations/${filename}`;
+                
+                link.href = modelSpecificPath;
+                const img = link.querySelector('img');
+                if (img) {
+                    img.src = modelSpecificPath;
+                }
+            });
+            
+            // Update performance analysis plot links
+            updatePlotLinks(modelValue);
+        }
+        
+        function updatePlotLinks(modelValue) {
+            const config = modelConfigs[modelValue];
+            const performanceCard = document.querySelectorAll('.card')[1]; // Performance Analysis card
+            const plotLinks = performanceCard.querySelectorAll('a');
+            
+            plotLinks.forEach(link => {
+                const originalHref = link.getAttribute('href');
+                const filename = originalHref.split('/').pop();
+                
+                // Use model-specific plots directory
+                const modelSpecificPath = `${config.reportPrefix}plots/${filename}`;
+                link.href = modelSpecificPath;
+            });
+        }
+        
+        function checkFileExists(path) {
+            // Try to fetch the file with HEAD request to check if it exists
+            return fetch(path, { method: 'HEAD' })
+                .then(response => response.ok)
+                .catch(() => false);
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeLinks();
+            
+            const modelSelect = document.getElementById('modelSelect');
+            
+            // Add event listener for model selection change
+            modelSelect.addEventListener('change', function() {
+                updateModelDisplay(this.value);
+            });
+            
+            // Set initial model display
+            updateModelDisplay(modelSelect.value);
+        });
+    </script>
+</body>
+</html>

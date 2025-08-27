@@ -1,0 +1,148 @@
+# MPS Configuration for OCR Batch Processing
+# Optimized for Apple Silicon (M1/M2/M3) execution
+
+# Processing Configuration
+processing:
+  device: "mps"
+  num_workers: 2  # Moderate workers for MPS processing
+  batch_size: 8  # Medium batch size for MPS efficiency
+  timeout: 45  # Slightly slower than GPU but faster than CPU
+  max_retries: 2
+  gpu_memory_limit: 0.7  # Use 70% of unified memory
+  enable_progress: true
+  enable_monitoring: true
+
+# Pipeline Configuration
+pipeline:
+  # Image Transform Pipeline Settings (MPS optimized)
+  image_transform:
+    batch_size: 8  # Medium batch for MPS efficiency
+    num_workers: 2  # Moderate workers for unified memory architecture
+    use_processes: false  # Use threads for better memory sharing
+    timeout: 45.0
+    
+    # Image Quality Settings (balanced for MPS performance)
+    quality_enhancement: true  # Enabled for better quality
+    normalize: true  # Enabled for better quality
+    grayscale_conversion: false
+    resize_images: false
+    target_size: null
+    max_image_size: [2048, 2048]  # Moderate max size for MPS
+    
+    # Advanced Transform Settings  
+    gaussian_blur: null
+    adaptive_threshold: false
+    
+  # OCR Reader Settings (MPS optimized)
+  ocr_reader:
+    device: "mps"
+    batch_size: 2  # MPS works well with smaller batches
+    confidence_threshold: 0.1
+    timeout_per_image: 45.0
+    model_kwargs:
+      # EasyOCR MPS optimization parameters
+      canvas_size: 2048
+      mag_ratio: 1.1
+      text_threshold: 0.6
+      low_text: 0.3
+      link_threshold: 0.3
+      width_ths: 0.4
+      height_ths: 0.4
+    
+  # Pipeline Coordination Settings
+  coordination:
+    enable_continuous_processing: true
+    max_buffer_refill_workers: 1
+    stats_update_interval: 3.0  # Moderate update frequency for MPS
+
+# OCR Model Configuration
+ocr_model:
+  name: "easyocr"
+  languages: ["en"]
+  gpu: true  # MPS is treated as GPU in EasyOCR
+
+# Dataset Configuration
+dataset:
+  data_dir: "data/funsd_subset"
+  num_documents: 300  # Process moderate amount with MPS
+  skip_download: false
+  validation_enabled: true
+
+# Evaluation Configuration
+evaluation:
+  normalize_text: true
+  lowercase: true
+  remove_punctuation: false
+  calculate_correlations: true
+
+# Cost Analysis Configuration
+cost_analysis:
+  hardware_costs:
+    cpu_cost: 800.0  # Higher cost for M-series chips
+    gpu_cost: 0.0    # Integrated GPU (no additional cost)
+    memory_cost: 300.0
+    storage_cost: 200.0
+    other_components: 400.0
+    cpu_lifespan_years: 5.0  # Apple Silicon typically lasts longer
+    gpu_lifespan_years: 5.0  # Integrated, same as CPU
+    memory_lifespan_years: 5.0
+    storage_lifespan_years: 5.0
+    other_lifespan_years: 5.0
+  
+  power_consumption:
+    cpu_idle_watts: 8.0   # More efficient Apple Silicon
+    cpu_load_watts: 35.0  # Much more efficient than x86
+    gpu_idle_watts: 0.0   # Integrated GPU
+    gpu_load_watts: 15.0  # Very efficient GPU
+    memory_watts: 5.0     # Unified memory architecture
+    storage_watts: 3.0    # Efficient SSD
+    motherboard_watts: 10.0
+    electricity_cost_kwh: 0.12
+  
+  cloud_costs:
+    google_vision_per_1k: 1.50
+    aws_textract_per_1k: 1.50
+    azure_vision_per_1k: 1.00
+    azure_forms_per_1k: 10.00
+
+# System Monitoring Configuration
+monitoring:
+  log_dir: "logs"
+  sampling_interval: 2.0  # Moderate sampling for MPS
+  enable_gpu_monitoring: false  # MPS monitoring not supported by NVML
+  enable_nvml: false
+
+# Reporting Configuration
+reporting:
+  output_dir: "results"
+  generate_html: true
+  generate_csv: true
+  generate_plots: true
+  generate_executive_summary: true
+  plot_dpi: 300
+  plot_style: "seaborn-v0_8"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: null
+  console_output: true
+  file_output: true
+  external_lib_level: "WARNING"
+
+# Error Handling Configuration
+error_handling:
+  max_retries: 2
+  base_delay: 0.5
+  max_delay: 30.0
+  backoff_factor: 2.0
+  error_log_retention_days: 30
+  enable_graceful_shutdown: true
+
+# Performance Optimization
+performance:
+  enable_multiprocessing: false  # Better to use threads with unified memory
+  memory_limit_gb: null
+  disk_space_threshold_gb: 1.0
+  cpu_threshold: 0.75  # More conservative threshold for thermal management
+  memory_threshold: 0.75

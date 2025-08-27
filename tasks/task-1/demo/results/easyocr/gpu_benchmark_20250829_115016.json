@@ -1,0 +1,45 @@
+{
+  "model": "EasyOCR",
+  "device": "cpu",
+  "device_name": "CPU",
+  "timestamp": "2025-08-29T11:49:42.811394",
+  "pytorch_version": "2.0.0+cu117",
+  "cuda_available": false,
+  "mps_available": false,
+  "images_processed": [
+    "71341634.png",
+    "87428306.png",
+    "83624198.png",
+    "00040534.png",
+    "0060262650.png"
+  ],
+  "processing_times": [
+    7.234800577163696,
+    6.67562198638916,
+    5.824153900146484,
+    6.7896270751953125,
+    7.259793519973755
+  ],
+  "detections": [
+    116,
+    82,
+    54,
+    121,
+    127
+  ],
+  "confidences": [
+    0.2955123151516954,
+    0.5775243036881833,
+    0.5667374218100508,
+    0.6833102948893586,
+    0.5046506419132195
+  ],
+  "avg_processing_time": 6.756799411773682,
+  "std_processing_time": 0.5213412063580508,
+  "min_processing_time": 5.824153900146484,
+  "max_processing_time": 7.259793519973755,
+  "fps": 0.14799906569040752,
+  "total_processing_time": 33.78399705886841,
+  "avg_detections": 100.0,
+  "avg_confidence": 0.5255469954905015
+}

@@ -50,7 +50,7 @@ class BaseOCRModel(ABC):
         Setup and validate device selection.
         
         Args:
-            device: Requested device ('auto', 'cpu', 'cuda', etc.)
+            device: Requested device ('auto', 'cpu', 'cuda', 'mps', etc.)
             
         Returns:
             Selected device string
@@ -61,9 +61,12 @@ class BaseOCRModel(ABC):
                 device = "cuda"
                 logger.info(f"CUDA available. Using GPU: {torch.cuda.get_device_name(0)}")
                 logger.info(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+            elif torch.backends.mps.is_available():
+                device = "mps"
+                logger.info("MPS (Apple Silicon) available. Using MPS acceleration")
             else:
                 device = "cpu"
-                logger.info("CUDA not available. Using CPU")
+                logger.info("No GPU available. Using CPU")
                 
         elif device.startswith("cuda"):
             if not torch.cuda.is_available():
@@ -76,6 +79,13 @@ class BaseOCRModel(ABC):
                     if gpu_idx >= torch.cuda.device_count():
                         logger.warning(f"GPU {gpu_idx} not found. Using default GPU")
                         device = "cuda:0"
+                        
+        elif device == "mps":
+            if not torch.backends.mps.is_available():
+                logger.warning("MPS requested but not available. Falling back to CPU")
+                device = "cpu"
+            else:
+                logger.info("Using MPS (Apple Silicon) acceleration")
                         
         return device
     

@@ -4,13 +4,48 @@
 # Processing Configuration
 processing:
   device: "auto"  # auto, cpu, gpu
-  num_workers: null  # null for auto-detection
-  batch_size: 10
+  num_workers: 1  # null for auto-detection
+  batch_size: 16
   timeout: 30  # seconds per document
   max_retries: 3
   gpu_memory_limit: 0.8
   enable_progress: true
   enable_monitoring: true
+
+# Pipeline Configuration
+pipeline:
+  # Image Transform Pipeline Settings
+  image_transform:
+    batch_size: 8  # Images to process in parallel
+    num_workers: null  # null for auto-detection based on CPU cores
+    use_processes: false  # false=threads, true=processes
+    timeout: 30.0  # seconds per batch
+    
+    # Image Quality Settings
+    quality_enhancement: false  # Apply noise reduction and CLAHE
+    normalize: false  # Apply histogram equalization
+    grayscale_conversion: false  # Convert to grayscale
+    resize_images: false  # Resize images to target size
+    target_size: null  # [width, height] or null
+    max_image_size: [2048, 2048]  # Maximum dimensions [width, height]
+    
+    # Advanced Transform Settings  
+    gaussian_blur: null  # [kernel_x, kernel_y] or null
+    adaptive_threshold: false  # Apply adaptive thresholding
+    
+  # OCR Reader Settings
+  ocr_reader:
+    device: "auto"  # auto, cpu, gpu (overrides processing.device if set)
+    batch_size: 1  # Images per OCR call
+    confidence_threshold: 0.1  # Minimum confidence to accept results
+    timeout_per_image: 30.0  # Maximum time per image in seconds
+    model_kwargs: {}  # Model-specific parameters
+    
+  # Pipeline Coordination Settings
+  coordination:
+    enable_continuous_processing: true  # Keep transform pipeline running
+    max_buffer_refill_workers: 1  # Workers for refilling transform buffer
+    stats_update_interval: 5.0  # Statistics update interval in seconds
 
 # OCR Model Configuration
 ocr_model:

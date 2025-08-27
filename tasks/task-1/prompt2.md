@@ -1,1 +1,0 @@
-Ok, now I want you to build steps 1-3 from the to-do list that you created. Let me know if you get stuck and I can help.

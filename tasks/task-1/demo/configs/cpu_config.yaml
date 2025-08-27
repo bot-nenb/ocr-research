@@ -2,58 +2,145 @@
 # Optimized for CPU-only execution
 
 # Processing Configuration
-device: "cpu"
-num_workers: 4  # Adjust based on CPU cores
-batch_size: 8
-timeout: 60  # Timeout per document in seconds
+processing:
+  device: "cpu"
+  num_workers: 4  # Adjust based on CPU cores
+  batch_size: 8
+  timeout: 60  # seconds per document
+  max_retries: 3
+  gpu_memory_limit: 0.8
+  enable_progress: true
+  enable_monitoring: true
 
-# OCR Model Settings
-model:
-  type: "easyocr"
+# Pipeline Configuration
+pipeline:
+  # Image Transform Pipeline Settings (CPU optimized)
+  image_transform:
+    batch_size: 8  # Smaller batch for CPU processing
+    num_workers: 4  # Match CPU cores
+    use_processes: false  # Use threads for CPU
+    timeout: 60.0
+    
+    # Image Quality Settings (conservative for CPU)
+    quality_enhancement: false  # Disabled for CPU speed
+    normalize: false  # Disabled for CPU speed
+    grayscale_conversion: false
+    resize_images: false
+    target_size: null
+    max_image_size: [1920, 1920]  # Smaller max size for CPU
+    
+    # Advanced Transform Settings  
+    gaussian_blur: null
+    adaptive_threshold: false
+    
+  # OCR Reader Settings (CPU optimized)
+  ocr_reader:
+    device: "cpu"
+    batch_size: 1  # Single image processing on CPU
+    confidence_threshold: 0.1
+    timeout_per_image: 60.0
+    model_kwargs:
+      # EasyOCR CPU optimization parameters
+      canvas_size: 1920
+      mag_ratio: 1.0
+      text_threshold: 0.7
+      low_text: 0.4
+      link_threshold: 0.4
+    
+  # Pipeline Coordination Settings
+  coordination:
+    enable_continuous_processing: true
+    max_buffer_refill_workers: 1
+    stats_update_interval: 5.0
+
+# OCR Model Configuration
+ocr_model:
+  name: "easyocr"
   languages: ["en"]
   gpu: false
-  quantize: true  # Use quantized models for faster CPU inference
-  
-  # EasyOCR specific settings for CPU optimization
-  easyocr:
-    canvas_size: 1920  # Smaller canvas for faster processing
-    mag_ratio: 1.0
-    text_threshold: 0.7
-    low_text: 0.4
-    link_threshold: 0.4
-    width_ths: 0.5
-    height_ths: 0.5
 
 # Dataset Configuration
 dataset:
-  num_documents: 100
   data_dir: "data/funsd_subset"
-  skip_validation: false
+  num_documents: 100
+  skip_download: false
+  validation_enabled: true
 
-# Monitoring Configuration
+# Evaluation Configuration
+evaluation:
+  normalize_text: true
+  lowercase: true
+  remove_punctuation: false
+  calculate_correlations: true
+
+# Cost Analysis Configuration
+cost_analysis:
+  hardware_costs:
+    cpu_cost: 500.0
+    gpu_cost: 0.0  # No GPU for CPU config
+    memory_cost: 200.0
+    storage_cost: 100.0
+    other_components: 300.0
+    cpu_lifespan_years: 4.0
+    gpu_lifespan_years: 3.0
+    memory_lifespan_years: 5.0
+    storage_lifespan_years: 5.0
+    other_lifespan_years: 5.0
+  
+  power_consumption:
+    cpu_idle_watts: 15.0
+    cpu_load_watts: 65.0
+    gpu_idle_watts: 0.0  # No GPU
+    gpu_load_watts: 0.0  # No GPU
+    memory_watts: 10.0
+    storage_watts: 5.0
+    motherboard_watts: 20.0
+    electricity_cost_kwh: 0.12
+  
+  cloud_costs:
+    google_vision_per_1k: 1.50
+    aws_textract_per_1k: 1.50
+    azure_vision_per_1k: 1.00
+    azure_forms_per_1k: 10.00
+
+# System Monitoring Configuration
 monitoring:
-  enabled: true
-  sampling_interval: 2.0  # seconds
-  memory_threshold: 0.85
-  cpu_threshold: 0.90
+  log_dir: "logs"
+  sampling_interval: 2.0  # Slower sampling for CPU
+  enable_gpu_monitoring: false  # No GPU monitoring
+  enable_nvml: false  # No GPU
 
-# Error Handling
+# Reporting Configuration
+reporting:
+  output_dir: "results"
+  generate_html: true
+  generate_csv: true
+  generate_plots: true
+  generate_executive_summary: true
+  plot_dpi: 300
+  plot_style: "seaborn-v0_8"
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: null
+  console_output: true
+  file_output: true
+  external_lib_level: "WARNING"
+
+# Error Handling Configuration
 error_handling:
   max_retries: 3
   base_delay: 1.0
-  enable_recovery: true
-  log_level: "INFO"
+  max_delay: 60.0
+  backoff_factor: 2.0
+  error_log_retention_days: 30
+  enable_graceful_shutdown: true
 
-# Output Configuration
-output:
-  generate_reports: true
-  save_plots: true
-  create_html_report: true
-  create_csv_summary: true
-
-# Cost Analysis
-cost_analysis:
-  electricity_cost_per_kwh: 0.12
-  cpu_cost: 500.0
-  memory_cost: 200.0
-  cpu_lifespan_years: 4.0
+# Performance Optimization
+performance:
+  enable_multiprocessing: false
+  memory_limit_gb: null
+  disk_space_threshold_gb: 1.0
+  cpu_threshold: 0.90  # Higher threshold for CPU
+  memory_threshold: 0.85

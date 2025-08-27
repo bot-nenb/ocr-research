@@ -68,7 +68,7 @@ source ~/.bashrc
 uv sync --extra dev --extra cpu --extra paddle
 
 # 4. Run the demo with default settings (processes 10 documents)
-uv run python batch_processing_demo.py --num-documents 10
+uv run python batch_processing_demo.py --num-documents 10 --config config.yaml
 
 # 5. View results in the generated HTML report
 firefox results/reports/*.html

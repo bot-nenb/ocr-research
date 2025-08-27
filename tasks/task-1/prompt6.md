@@ -1,1 +1,0 @@
-Now build steps 10-14. When you are finished let me know.

@@ -1,0 +1,28 @@
+{
+  "executive_summary": {
+    "title": "OCR Batch Processing Executive Summary",
+    "generated_at": "2025-08-29T10:14:52.568307",
+    "key_findings": {
+      "accuracy_performance": {
+        "avg_word_accuracy_percent": 24.582811014562147,
+        "avg_char_accuracy_percent": 50.960799057941784,
+        "documents_above_90_percent": 0
+      },
+      "cost_efficiency": {
+        "total_local_cost_usd": 0.0052287948811190746,
+        "equivalent_cloud_cost_usd": 0.128,
+        "total_savings_usd": 0.12277120511888093,
+        "savings_percentage": 95.91500399912573
+      },
+      "operational_efficiency": {
+        "processing_speed_docs_per_minute": 11.196687340233106,
+        "peak_cpu_usage_percent": 83.8,
+        "peak_memory_usage_gb": 4.599582672119141
+      }
+    },
+    "recommendations": [
+      "\u274c Accuracy below 80%. Review document quality and OCR model selection.",
+      "\ud83d\udcb0 Significant cost savings achieved (95.9%). Strong ROI for local processing."
+    ]
+  }
+}

@@ -33,7 +33,7 @@ class EasyOCRModel(BaseOCRModel):
         Initialize EasyOCR model.
         
         Args:
-            device: Device to use ('auto', 'cpu', 'cuda')
+            device: Device to use ('auto', 'cpu', 'cuda', 'mps')
             languages: List of language codes (default: ['en'])
             gpu_memory_limit: Maximum GPU memory to use in GB
             model_storage_directory: Directory to store downloaded models
@@ -67,8 +67,8 @@ class EasyOCRModel(BaseOCRModel):
     def initialize_model(self):
         """Initialize EasyOCR reader with appropriate device settings."""
         try:
-            # Determine if GPU should be used
-            gpu = "cuda" in str(self._device)
+            # Determine if GPU should be used (CUDA or MPS)
+            gpu = "cuda" in str(self._device) or "mps" in str(self._device)
             
             # Set up additional parameters
             kwargs = {
@@ -87,9 +87,19 @@ class EasyOCRModel(BaseOCRModel):
                 kwargs["quantize"] = True
                 logger.info("Using quantized models for faster CPU inference")
                 
-            if gpu and self.cudnn_benchmark:
+            if gpu and self.cudnn_benchmark and "cuda" in str(self._device):
                 kwargs["cudnn_benchmark"] = True
                 logger.info("Enabled cuDNN benchmark for GPU optimization")
+            
+            # For MPS, we need to handle device assignment differently
+            if "mps" in str(self._device):
+                # EasyOCR doesn't natively support MPS, but we can force PyTorch to use it
+                import torch
+                torch.set_default_tensor_type('torch.FloatTensor')
+                # Set the default device for PyTorch operations
+                if torch.backends.mps.is_available():
+                    logger.info("Configuring EasyOCR to use MPS backend")
+                    # Note: EasyOCR will still think it's using CUDA, but PyTorch will route to MPS
             
             # Create the reader
             self._model = easyocr.Reader(
@@ -97,13 +107,27 @@ class EasyOCRModel(BaseOCRModel):
                 **kwargs
             )
             
+            # If MPS, manually move models to MPS device
+            if "mps" in str(self._device):
+                try:
+                    import torch
+                    device = torch.device("mps")
+                    if hasattr(self._model, 'detector') and self._model.detector:
+                        self._model.detector = self._model.detector.to(device)
+                        logger.info("Moved detector model to MPS device")
+                    if hasattr(self._model, 'recognizer') and self._model.recognizer:
+                        self._model.recognizer = self._model.recognizer.to(device)
+                        logger.info("Moved recognizer model to MPS device")
+                except Exception as mps_error:
+                    logger.warning(f"Could not move models to MPS: {mps_error}")
+            
             logger.info(f"EasyOCR initialized successfully on {self._device}")
             logger.info(f"Languages: {self.languages}")
             
         except Exception as e:
             logger.error(f"Failed to initialize EasyOCR: {e}")
-            # Try fallback to CPU if GPU fails
-            if "cuda" in str(self._device):
+            # Try fallback to CPU if GPU/MPS fails
+            if "cuda" in str(self._device) or "mps" in str(self._device):
                 logger.warning("Falling back to CPU mode")
                 self._device = "cpu"
                 kwargs["gpu"] = False
@@ -153,6 +177,13 @@ class EasyOCRModel(BaseOCRModel):
         Returns:
             Dictionary with OCR results
         """
+        # Get image identifier for logging
+        if isinstance(image_input, (str, Path)):
+            image_id = Path(image_input).stem
+            logger.info(f"Starting EasyOCR processing for image: {image_id}")
+        else:
+            logger.info("Starting EasyOCR processing for numpy array image")
+            
         start_time = time.time()
         
         try:
@@ -227,12 +258,16 @@ class EasyOCRModel(BaseOCRModel):
             
             processing_time = time.time() - start_time
             
+            # Log completion details
+            avg_confidence = np.mean(confidences) if confidences else 0.0
+            logger.info(f"EasyOCR completed: {len(text_lines)} text detections, avg confidence: {avg_confidence:.3f}, time: {processing_time:.2f}s")
+            
             return {
                 "text": "\n".join(text_lines),
                 "text_lines": text_lines,
                 "boxes": boxes,
                 "confidences": confidences,
-                "avg_confidence": np.mean(confidences) if confidences else 0.0,
+                "avg_confidence": avg_confidence,
                 "num_detections": len(text_lines),
                 "processing_time": processing_time,
                 "image_size": (width, height),
@@ -274,6 +309,8 @@ class EasyOCRModel(BaseOCRModel):
         if batch_size is None:
             if "cuda" in str(self._device):
                 batch_size = 4  # GPU can handle larger batches
+            elif "mps" in str(self._device):
+                batch_size = 2  # MPS can handle moderate batches
             else:
                 batch_size = 1  # CPU processes one at a time
                 
@@ -333,13 +370,17 @@ class EasyOCRModel(BaseOCRModel):
             
     def optimize_for_device(self):
         """Optimize model settings for current device."""
-        if "cuda" in str(self._device):
-            # GPU optimizations
+        if "cuda" in str(self._device) or "mps" in str(self._device):
+            # GPU/MPS optimizations
             if hasattr(self._model, 'detector') and self._model.detector:
                 self._model.detector.eval()
             if hasattr(self._model, 'recognizer') and self._model.recognizer:
                 self._model.recognizer.eval()
-            logger.info("Applied GPU optimizations")
+            
+            if "mps" in str(self._device):
+                logger.info("Applied MPS (Apple Silicon) optimizations")
+            else:
+                logger.info("Applied GPU optimizations")
         else:
             # CPU optimizations
             if self.quantize:

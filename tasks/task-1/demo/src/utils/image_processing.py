@@ -137,7 +137,7 @@ class OCRVisualizer:
                     # Draw polygon for exact bounding box
                     draw.polygon(points, outline=colors[i % len(colors)], width=box_thickness)
                     
-                elif len(bbox) == 4 and all(isinstance(coord, (int, float)) for coord in bbox):
+                elif len(bbox) == 4 and all(isinstance(coord, (int, float, np.integer, np.floating)) for coord in bbox):
                     # Simple rectangle format: [x_min, y_min, x_max, y_max]
                     x_min, y_min, x_max, y_max = map(int, bbox)
                     draw.rectangle([x_min, y_min, x_max, y_max], 
@@ -472,11 +472,11 @@ def create_ocr_visualization_report(processing_results: List,
     for i, result in enumerate(successful_results[:max_documents]):
         try:
             # Create OCR overlay visualization
-            if result.image_path and Path(result.image_path).exists():
+            if result.original_path and Path(result.original_path).exists():
                 overlay_path = vis_dir / f"{result.doc_id}_ocr_overlay.png"
                 
                 visualizer.save_visualization(
-                    image=result.image_path,
+                    image=result.original_path,
                     bounding_boxes=result.bounding_boxes,
                     text_lines=result.text_lines,
                     confidences=result.line_confidences,
@@ -486,7 +486,7 @@ def create_ocr_visualization_report(processing_results: List,
                 
                 visualization_paths[result.doc_id] = {
                     'overlay_path': str(overlay_path),
-                    'original_path': result.image_path
+                    'original_path': result.original_path
                 }
             
             # Create text diff if ground truth available
@@ -509,3 +509,139 @@ def create_ocr_visualization_report(processing_results: List,
         'text_diffs': text_diffs,
         'output_directory': str(vis_dir)
     }
+
+
+class TextDiffHighlighter:
+    """Creates side-by-side HTML diff visualizations for OCR text comparison."""
+    
+    def __init__(self):
+        """Initialize the text diff highlighter."""
+        self.logger = logging.getLogger(__name__)
+        
+    def create_diff_html(self, ground_truth: str, ocr_text: str, doc_id: str, include_stats: bool = True) -> str:
+        """
+        Create HTML diff comparison between ground truth and OCR text.
+        
+        Args:
+            ground_truth: Reference/ground truth text
+            ocr_text: OCR output text  
+            doc_id: Document identifier
+            include_stats: Whether to include comparison statistics
+            
+        Returns:
+            HTML string with diff visualization
+        """
+        try:
+            # Calculate basic statistics
+            gt_words = ground_truth.split()
+            ocr_words = ocr_text.split()
+            
+            # Calculate character edit distance for similarity
+            import difflib
+            similarity = difflib.SequenceMatcher(None, ground_truth, ocr_text).ratio()
+            char_edit_dist = self._calculate_edit_distance(ground_truth, ocr_text)
+            
+            # Generate word-level diff using difflib
+            gt_highlighted, ocr_highlighted = self._create_word_diff(ground_truth, ocr_text)
+            
+            # Build HTML
+            stats_html = ""
+            if include_stats:
+                stats_html = f"""
+            <div class="diff-stats">
+                <h4>Comparison Statistics</h4>
+                <p><strong>Character Edit Distance:</strong> {char_edit_dist}</p>
+                <p><strong>Similarity:</strong> {similarity*100:.1f}%</p>
+                <p><strong>Ground Truth Words:</strong> {len(gt_words)}</p>
+                <p><strong>OCR Words:</strong> {len(ocr_words)}</p>
+            </div>
+            """
+            
+            html = f"""
+        <div class="text-diff-container">
+            <h3>Text Comparison - {doc_id}</h3>
+            {stats_html}
+            <div class="diff-comparison">
+                <div class="diff-column">
+                    <h4>Ground Truth</h4>
+                    <div class="diff-text">{gt_highlighted}</div>
+                </div>
+                <div class="diff-column">
+                    <h4>OCR Result</h4>
+                    <div class="diff-text">{ocr_highlighted}</div>
+                </div>
+            </div>
+        </div>
+        """
+            
+            return html.strip()
+            
+        except Exception as e:
+            self.logger.error(f"Error creating diff HTML for {doc_id}: {e}")
+            return f'<div class="diff-error">Error generating text comparison for {doc_id}</div>'
+    
+    def _create_word_diff(self, text1: str, text2: str) -> Tuple[str, str]:
+        """
+        Create word-level diff highlighting using proper sequence matching.
+        
+        Returns:
+            Tuple of (highlighted_text1, highlighted_text2) with HTML spans
+        """
+        import difflib
+        
+        # Split into words while preserving whitespace
+        words1 = text1.split()
+        words2 = text2.split()
+        
+        # Use difflib to get proper sequence matching
+        matcher = difflib.SequenceMatcher(None, words1, words2)
+        
+        highlighted1 = []
+        highlighted2 = []
+        
+        for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
+            if opcode == 'equal':
+                # Words are the same
+                highlighted1.extend(words1[i1:i2])
+                highlighted2.extend(words2[j1:j2])
+            elif opcode == 'replace':
+                # Words are different - mark as changed
+                for word in words1[i1:i2]:
+                    highlighted1.append(f'<span class="diff-changed">{self._escape_html(word)}</span>')
+                for word in words2[j1:j2]:
+                    highlighted2.append(f'<span class="diff-changed">{self._escape_html(word)}</span>')
+            elif opcode == 'delete':
+                # Words only in text1 - mark as deleted
+                for word in words1[i1:i2]:
+                    highlighted1.append(f'<span class="diff-deleted">{self._escape_html(word)}</span>')
+            elif opcode == 'insert':
+                # Words only in text2 - mark as inserted
+                for word in words2[j1:j2]:
+                    highlighted2.append(f'<span class="diff-inserted">{self._escape_html(word)}</span>')
+        
+        return ' '.join(highlighted1), ' '.join(highlighted2)
+    
+    def _calculate_edit_distance(self, s1: str, s2: str) -> int:
+        """Calculate character-level edit distance (Levenshtein distance)."""
+        if len(s1) < len(s2):
+            return self._calculate_edit_distance(s2, s1)
+        
+        if len(s2) == 0:
+            return len(s1)
+        
+        previous_row = list(range(len(s2) + 1))
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+        
+        return previous_row[-1]
+    
+    def _escape_html(self, text: str) -> str:
+        """Escape HTML special characters."""
+        import html
+        return html.escape(text)

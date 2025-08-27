@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Research Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .demos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .demo-card {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .demo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .demo-card h2 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .demo-card p {
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+        
+        .demo-card .status {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        
+        .status.active {
+            background: #e8f5e8;
+            color: #2d5a2d;
+        }
+        
+        .status.upcoming {
+            background: #f0f0f0;
+            color: #666;
+        }
+        
+        .demo-links {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .demo-link {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+        
+        .demo-link:hover {
+            background: #5a6fd8;
+        }
+        
+        .demo-link.secondary {
+            background: #95a5a6;
+        }
+        
+        .demo-link.secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 3rem;
+        }
+        
+        .coming-soon {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>OCR Research Project</h1>
+            <p>Comprehensive OCR analysis and evaluation framework</p>
+        </div>
+        
+        <div class="demos-grid">
+            <div class="demo-card" onclick="window.location.href='demos/task-1/'">
+                <div class="status active">Active</div>
+                <h2>Task 1: FUNSD Dataset Analysis</h2>
+                <p>Complete OCR evaluation on the FUNSD dataset with accuracy metrics, visualizations, and detailed analysis reports.</p>
+                <div class="demo-links">
+                    <a href="demos/task-1/" class="demo-link">View Reports</a>
+                </div>
+            </div>
+            
+            <div class="demo-card coming-soon">
+                <div class="status upcoming">Coming Soon</div>
+                <h2>Task 2: Multi-Language OCR</h2>
+                <p>OCR evaluation across multiple languages and writing systems with comparative analysis.</p>
+                <div class="demo-links">
+                    <a href="#" class="demo-link">Coming Soon</a>
+                </div>
+            </div>
+            
+            <div class="demo-card coming-soon">
+                <div class="status upcoming">Coming Soon</div>
+                <h2>Task 3: Real-time OCR Pipeline</h2>
+                <p>Real-time OCR processing pipeline with live accuracy monitoring and performance benchmarks.</p>
+                <div class="demo-links">
+                    <a href="#" class="demo-link">Coming Soon</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>OCR Research Project - Automated report generation and analysis</p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-refresh detection for new reports
+        function checkForUpdates() {
+            console.log('Checking for report updates...');
+        }
+        
+        setInterval(checkForUpdates, 30000);
+    </script>
+</body>
+</html>

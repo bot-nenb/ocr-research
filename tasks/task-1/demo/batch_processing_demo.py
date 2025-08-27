@@ -10,6 +10,7 @@ accuracy evaluation, and cost analysis.
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -20,14 +21,17 @@ import yaml
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from batch_processor.batch_processor import BatchProcessor, ProcessingConfig
+from pipeline import PipelineCoordinator, PipelineConfig, ImageTransformConfig, OCRConfig
 from models.easyocr_model import EasyOCRModel
-from utils.config_manager import ConfigManager
+from models.paddleocr_model import PaddleOCRModel
+from utils.config_manager import ConfigManager, ProcessingConfig
 from utils.cost_analysis import CostAnalyzer
 from utils.dataset_loader import FUNSDLoader
 from utils.evaluation import EvaluationMetrics
 from utils.monitoring import PerformanceTracker, SystemMonitor
 from utils.reporting import ReportGenerator
+from utils.gpu_monitoring import GPUMonitor
+from utils.gpu_report_generator import GPUPerformanceReportGenerator
 
 
 def setup_logging(log_level: str = "INFO", log_file: Optional[str] = None):
@@ -95,22 +99,30 @@ def setup_logging_from_config(logging_config):
         force=True  # Override any existing configuration
     )
     
-    # Reduce noise from external libraries
+    # Reduce noise from external libraries (but keep our model logs)
     logging.getLogger('matplotlib').setLevel(getattr(logging, logging_config.external_lib_level))
     logging.getLogger('PIL').setLevel(getattr(logging, logging_config.external_lib_level))
     logging.getLogger('easyocr').setLevel(getattr(logging, logging_config.external_lib_level))
+    logging.getLogger('paddleocr').setLevel(getattr(logging, logging_config.external_lib_level))
+    logging.getLogger('urllib3').setLevel(getattr(logging, logging_config.external_lib_level))
+    
+    # Keep our model logs at INFO level for detailed OCR logging
+    logging.getLogger('models.easyocr_model').setLevel(logging.INFO)
+    logging.getLogger('models.paddleocr_model').setLevel(logging.INFO)
+    logging.getLogger('pipeline.ocr_reader').setLevel(logging.INFO)
+    logging.getLogger('pipeline.pipeline_coordinator').setLevel(logging.INFO)
 
 
 @click.command()
-@click.option('--device', default='auto', 
-              help='Device to use: auto, cpu, gpu')
-@click.option('--model', default='easyocr', 
+@click.option('--device', default=None,
+              help='Device to use: auto, cpu, gpu, cuda, mps')
+@click.option('--model', default=None,
               help='OCR model: easyocr, paddleocr')
-@click.option('--num-documents', default=100, type=int,
+@click.option('--num-documents', default=None, type=int,
               help='Number of documents to process')
 @click.option('--num-workers', default=None, type=int,
               help='Number of worker processes/threads')
-@click.option('--batch-size', default=10, type=int,
+@click.option('--batch-size', default=None, type=int,
               help='Batch size for processing')
 @click.option('--config', default=None,
               help='Path to configuration file')
@@ -128,10 +140,18 @@ def setup_logging_from_config(logging_config):
               help='Generate comprehensive reports')
 @click.option('--skip-download', is_flag=True,
               help='Skip dataset download if already present')
+@click.option('--quality-enhancement', is_flag=True, default=None,
+              help='Enable image quality enhancement (noise reduction, CLAHE)')
+@click.option('--normalize-images', is_flag=True, default=None,  
+              help='Enable image normalization (histogram equalization)')
+@click.option('--ocr-batch-size', default=None, type=int,
+              help='OCR batch size (images per OCR call)')
 def main(device: str, model: str, num_documents: int, num_workers: Optional[int],
          batch_size: int, config: Optional[str], output_dir: str,
          dataset_dir: str, log_level: str, dry_run: bool,
-         resume_from: Optional[str], generate_reports: bool, skip_download: bool):
+         resume_from: Optional[str], generate_reports: bool, skip_download: bool,
+         quality_enhancement: Optional[bool], normalize_images: Optional[bool], 
+         ocr_batch_size: Optional[int]):
     """
     OCR Batch Processing Demo
     
@@ -149,17 +169,26 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
         
         # Override with command line arguments
         config_manager.override_from_cli(
-            device=device,
-            num_workers=num_workers,
-            batch_size=batch_size,
-            num_documents=num_documents,
-            dataset_dir=dataset_dir,
-            output_dir=output_dir,
-            generate_reports=generate_reports,
-            model=model,
-            log_level=log_level,
-            skip_download=skip_download
+            device=device if device else app_config.processing.device,
+            num_workers=num_workers if num_workers is not None else app_config.processing.num_workers,
+            batch_size=batch_size if batch_size is not None else app_config.processing.batch_size,
+            num_documents=num_documents if num_documents is not None else app_config.dataset.num_documents,
+            dataset_dir=dataset_dir if dataset_dir is not None else app_config.dataset.data_dir,
+            output_dir=output_dir if output_dir is not None else app_config.reporting.output_dir,
+            generate_reports=generate_reports if generate_reports is not None else app_config.reporting.generate_reports,
+            model=model if model else app_config.ocr_model.name,
+            log_level=log_level if log_level else app_config.logging.level,
+            skip_download=skip_download if skip_download else app_config.dataset.skip_download,
+            # Pipeline-specific parameters
+            quality_enhancement=quality_enhancement,
+            normalize_images=normalize_images,
+            ocr_batch_size=ocr_batch_size
         )
+        
+        # Create model-specific output directory
+        base_output_dir = app_config.reporting.output_dir
+        model_name = app_config.ocr_model.name.lower()
+        app_config.reporting.output_dir = f"{base_output_dir}/{model_name}"
         
         # Validate configuration
         validation_issues = config_manager.validate_config()
@@ -234,22 +263,34 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
                 languages=app_config.ocr_model.languages, 
                 device=app_config.processing.device
             )
+        elif app_config.ocr_model.name.lower() == 'paddleocr':
+            ocr_model = PaddleOCRModel(
+                languages=app_config.ocr_model.languages,
+                device=app_config.processing.device
+            )
         else:
-            click.echo("❌ Only EasyOCR is currently supported in this demo")
+            click.echo(f"❌ Unsupported OCR model: {app_config.ocr_model.name}")
+            click.echo("   Supported models: easyocr, paddleocr")
             return False
         
         click.echo(f"✅ {app_config.ocr_model.name} model initialized on {app_config.processing.device}")
         
-        # Step 3: Batch Processing Setup
-        click.echo("\n⚙️  Step 3: Batch Processing Setup")
+        # Step 3: Pipeline Setup
+        click.echo("\n⚙️  Step 3: Pipeline Setup")
         click.echo("-" * 50)
         
-        batch_processor = BatchProcessor(app_config.processing, ocr_model)
+        # Get pipeline configurations from the config manager
+        transform_config, ocr_config, pipeline_config = config_manager.get_pipeline_configs()
         
-        click.echo(f"✅ Batch processor configured:")
-        click.echo(f"   Device: {app_config.processing.device}")
-        click.echo(f"   Workers: {batch_processor.num_workers}")
-        click.echo(f"   Batch size: {app_config.processing.batch_size}")
+        click.echo(f"✅ Pipeline configured from config file:")
+        click.echo(f"   OCR Device: {ocr_config.device}")
+        click.echo(f"   Transform Workers: {transform_config.num_workers}")
+        click.echo(f"   Transform Batch Size: {transform_config.batch_size}")
+        click.echo(f"   OCR Batch Size: {ocr_config.batch_size}")
+        click.echo(f"   Quality Enhancement: {transform_config.quality_enhancement}")
+        click.echo(f"   Image Normalization: {transform_config.normalize}")
+        click.echo(f"   Max Image Size: {transform_config.max_image_size}")
+        click.echo(f"   Continuous Processing: {pipeline_config.enable_continuous_processing}")
         
         # Step 4: System Monitoring
         click.echo("\n📊 Step 4: Starting System Monitoring")
@@ -260,6 +301,17 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
             sampling_interval=app_config.monitoring.sampling_interval
         )
         performance_tracker = PerformanceTracker()
+        
+        # Initialize GPU monitoring for GPU/MPS devices
+        gpu_monitor = None
+        if app_config.processing.device in ['gpu', 'cuda', 'mps']:
+            try:
+                gpu_monitor = GPUMonitor(device_type=app_config.processing.device)
+                gpu_monitor.start_monitoring()
+                click.echo(f"✅ GPU monitoring active for {app_config.processing.device}")
+            except Exception as e:
+                click.echo(f"⚠️  GPU monitoring failed: {e}")
+                gpu_monitor = None
         
         system_monitor.start()
         performance_tracker.start_tracking()
@@ -290,24 +342,75 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
         
         click.echo(f"Processing {len(documents_to_process)} documents...")
         
-        # Process batch
-        processing_results = batch_processor.process_batch(
-            documents_to_process, 
-            ground_truth_data
-        )
+        # Convert documents to pipeline format (image_path, doc_id)
+        pipeline_inputs = []
+        for doc_id, image, image_path in documents_to_process:
+            if image_path:  # Use file path if available
+                pipeline_inputs.append((image_path, doc_id))
+            else:
+                # Save temporary image file for cases where only array is available
+                import tempfile
+                import cv2
+                temp_fd, temp_path = tempfile.mkstemp(suffix='.png')
+                os.close(temp_fd)
+                cv2.imwrite(temp_path, image)
+                pipeline_inputs.append((temp_path, doc_id))
         
-        # Record performance
+        # Process with pipeline
+        with PipelineCoordinator(pipeline_config, ocr_model) as coordinator:
+            processing_results = coordinator.process_images(pipeline_inputs)
+        
+        # Record performance and convert results
+        successful_results = []
+        failed_results = []
+        
         for result in processing_results:
+            # Convert OCRResult to format expected by rest of code
+            processing_time = result.processing_time + result.transform_time
             performance_tracker.record_document(
-                result.processing_time,
+                processing_time,
                 success=result.success
             )
+            
+            if result.success:
+                successful_results.append(result)
+            else:
+                failed_results.append(result)
+            
+            # Collect GPU metrics sample during processing
+            if gpu_monitor:
+                gpu_monitor.collect_sample()
         
         performance_tracker.stop_tracking()
         system_monitor.stop()
         
-        # Get processing statistics
-        batch_stats = batch_processor.get_statistics()
+        # Stop GPU monitoring and get metrics
+        gpu_metrics = None
+        if gpu_monitor:
+            gpu_monitor.stop_monitoring()
+            gpu_metrics = gpu_monitor.get_summary()
+            click.echo(f"✅ GPU monitoring completed: {gpu_metrics.get('samples_collected', 0)} samples")
+        
+        # Calculate statistics (simplified from BatchProcessor)
+        total_results = len(processing_results)
+        successful_count = len(successful_results)
+        success_rate = successful_count / total_results if total_results > 0 else 0
+        
+        if successful_results:
+            processing_times = [r.processing_time + r.transform_time for r in successful_results]
+            total_time = sum(processing_times)
+            docs_per_second = successful_count / total_time if total_time > 0 else 0
+        else:
+            docs_per_second = 0
+        
+        batch_stats = {
+            'success_rate': success_rate,
+            'docs_per_second': docs_per_second,
+            'total_processed': total_results,
+            'successful': successful_count,
+            'failed': len(failed_results)
+        }
+        
         performance_metrics = performance_tracker.get_metrics()
         monitoring_summary = system_monitor.get_summary()
         
@@ -363,7 +466,7 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
         
         total_processing_time = sum(r.processing_time for r in processing_results if r.success)
         avg_cpu_utilization = monitoring_summary.get('cpu', {}).get('avg_percent', 0) / 100.0
-        uses_gpu = app_config.processing.device == 'gpu'
+        uses_gpu = app_config.processing.device in ['gpu', 'cuda', 'mps']
         
         cost_analysis = cost_analyzer.analyze_processing_session(
             processing_time_seconds=total_processing_time,
@@ -407,6 +510,7 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
             # Generate HTML report if enabled
             html_report_path = None
             if app_config.reporting.generate_html:
+                # Add model name to the report
                 html_report_path = report_generator.generate_html_report(
                     processing_results,
                     evaluation_metrics,
@@ -414,15 +518,57 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
                     monitoring_summary,
                     plot_paths,
                     visual_comparison_data,
-                    ground_truth_data
+                    ground_truth_data,
+                    model_name=app_config.ocr_model.name
                 )
+            
+            # Generate GPU performance report for GPU/MPS devices
+            gpu_performance_report_path = None
+            if gpu_metrics and app_config.processing.device in ['gpu', 'cuda', 'mps']:
+                try:
+                    gpu_report_generator = GPUPerformanceReportGenerator(output_dir=output_path / "reports")
+                    
+                    # Convert processing results to format expected by GPU report generator
+                    gpu_processing_results = [
+                        {
+                            'success': r.success,
+                            'processing_time': r.processing_time,
+                            'transform_time': r.transform_time,
+                            'doc_id': r.doc_id
+                        }
+                        for r in processing_results
+                    ]
+                    
+                    # Configuration dict for GPU report
+                    gpu_config = {
+                        'batch_size': app_config.processing.batch_size,
+                        'num_workers': app_config.processing.num_workers,
+                        'quality_enhancement': transform_config.quality_enhancement,
+                        'device': app_config.processing.device
+                    }
+                    
+                    gpu_performance_report_path = gpu_report_generator.generate_performance_report(
+                        processing_results=gpu_processing_results,
+                        gpu_metrics=gpu_metrics,
+                        system_metrics=monitoring_summary,
+                        device_type=app_config.processing.device,
+                        model_name=app_config.ocr_model.name,
+                        config=gpu_config
+                    )
+                    
+                    click.echo(f"✅ GPU performance report generated: {gpu_performance_report_path.name}")
+                    
+                except Exception as e:
+                    click.echo(f"⚠️  GPU performance report failed: {e}")
+                    logging.warning(f"GPU performance report generation failed: {e}")
             
             # Generate CSV summary if enabled
             csv_path = None
             if app_config.reporting.generate_csv:
                 csv_path = report_generator.generate_csv_summary(
                     processing_results,
-                    evaluation_results
+                    evaluation_results,
+                    model_name=app_config.ocr_model.name
                 )
             
             # Generate executive summary if enabled
@@ -492,7 +638,10 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
         
         click.echo(f"🎯 Processing Summary:")
         click.echo(f"   Documents processed: {successful_docs}/{total_docs}")
-        click.echo(f"   Success rate: {successful_docs/total_docs*100:.1f}%")
+        if total_docs > 0:
+            click.echo(f"   Success rate: {successful_docs/total_docs*100:.1f}%")
+        else:
+            click.echo(f"   Success rate: 0.0%")
         click.echo(f"   Processing speed: {batch_stats.get('docs_per_second', 0)*60:.1f} docs/minute")
         
         if evaluation_metrics:
@@ -520,6 +669,182 @@ def main(device: str, model: str, num_documents: int, num_workers: Optional[int]
                 click.echo("   💵 Moderate savings - consider scaling up")
             else:
                 click.echo("   💸 Higher costs than cloud - review efficiency")
+        
+        # Step 10: Copy Results to GitHub Pages (docs directory)
+        click.echo("\n📋 Step 10: Updating GitHub Pages")
+        click.echo("-" * 50)
+        
+        try:
+            # Copy results to docs directory for GitHub Pages
+            import shutil
+            
+            # Find repo root by looking for docs directory
+            current_dir = Path(__file__).resolve().parent
+            repo_root = None
+            
+            # Walk up directories to find the one containing docs/
+            for _ in range(10):  # Safety limit
+                if (current_dir / "docs").exists():
+                    repo_root = current_dir
+                    break
+                parent = current_dir.parent
+                if parent == current_dir:  # Reached filesystem root
+                    break
+                current_dir = parent
+            
+            if repo_root is None:
+                raise RuntimeError("Could not find repository root with docs/ directory")
+                
+            docs_dir = repo_root / "docs"
+            docs_task1_dir = docs_dir / "demos" / "task-1"
+            
+            # Ensure docs directories exist
+            docs_task1_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Copy main results files with model-specific naming
+            if results_path.exists():
+                shutil.copy2(results_path, docs_dir / f"{model_name}_complete_results.json")
+                click.echo(f"   ✅ Complete results copied to docs/{model_name}_complete_results.json")
+                
+            # Copy executive summary if it exists
+            exec_summary_path = output_path / "executive_summary.json"
+            if exec_summary_path.exists():
+                shutil.copy2(exec_summary_path, docs_dir / f"{model_name}_executive_summary.json")
+                click.echo(f"   ✅ Executive summary copied to docs/{model_name}_executive_summary.json")
+            
+            # Copy reports directory contents
+            reports_dir = output_path / "reports"
+            if reports_dir.exists():
+                # Copy all HTML reports and fix paths
+                for html_file in reports_dir.glob("*.html"):
+                    # Read HTML content
+                    with open(html_file, 'r') as f:
+                        html_content = f.read()
+                    
+                    # Fix plot paths for GitHub Pages (handle model-specific subdirectories)
+                    html_content = html_content.replace(f'src="results/{model_name}/reports/plots/', f'src="{model_name}_plots/')
+                    html_content = html_content.replace(f'src="results/{model_name}/reports/visualizations/', f'src="{model_name}_visualizations/')
+                    html_content = html_content.replace('src="results/reports/plots/', f'src="{model_name}_plots/')  # Fallback for old format
+                    html_content = html_content.replace('src="results/reports/visualizations/', f'src="{model_name}_visualizations/')  # Fallback for old format
+                    
+                    # Fix JavaScript visualization data paths
+                    html_content = html_content.replace('"original_path": "data/funsd_subset/subset_100/images/', '"original_path": "original_images/')
+                    html_content = html_content.replace(f'"overlay_path": "results/{model_name}/reports/visualizations/', f'"overlay_path": "{model_name}_visualizations/')
+                    html_content = html_content.replace('"overlay_path": "results/reports/visualizations/', f'"overlay_path": "{model_name}_visualizations/')  # Fallback for old format
+                    
+                    # Write fixed content to docs directory
+                    dest_file = docs_task1_dir / html_file.name
+                    with open(dest_file, 'w') as f:
+                        f.write(html_content)
+                    
+                    # Log special handling for GPU performance reports
+                    if "performance" in html_file.name and app_config.processing.device in ['gpu', 'cuda', 'mps']:
+                        click.echo(f"   🎮 GPU performance report copied: {html_file.name}")
+                    else:
+                        click.echo(f"   ✅ Report copied with fixed paths: {html_file.name}")
+                
+                # Copy all CSV summaries  
+                for csv_file in reports_dir.glob("*.csv"):
+                    shutil.copy2(csv_file, docs_task1_dir)
+                    click.echo(f"   ✅ CSV summary copied: {csv_file.name}")
+                
+                # Copy plots directory to model-specific subdirectory
+                plots_src = reports_dir / "plots"
+                plots_dst = docs_task1_dir / f"{model_name}_plots"
+                if plots_src.exists():
+                    if plots_dst.exists():
+                        shutil.rmtree(plots_dst)
+                    shutil.copytree(plots_src, plots_dst)
+                    click.echo(f"   ✅ Plots copied to docs/demos/task-1/{model_name}_plots/")
+                
+                # Copy visualizations directory to model-specific subdirectory
+                viz_src = reports_dir / "visualizations"
+                viz_dst = docs_task1_dir / f"{model_name}_visualizations"
+                if viz_src.exists():
+                    if viz_dst.exists():
+                        shutil.rmtree(viz_dst)
+                    shutil.copytree(viz_src, viz_dst)
+                    click.echo(f"   ✅ Visualizations copied to docs/demos/task-1/{model_name}_visualizations/")
+                    
+                    # Copy corresponding original images to original_images directory
+                    original_imgs_dst = docs_task1_dir / "original_images"
+                    original_imgs_dst.mkdir(exist_ok=True)
+                    
+                    # Clear existing original images to ensure sync
+                    for existing_img in original_imgs_dst.glob("*.png"):
+                        existing_img.unlink()
+                    
+                    # Extract image names from visualization files and copy original images
+                    for viz_file in viz_src.glob("*_ocr_overlay.png"):
+                        # Extract original image name (remove _ocr_overlay suffix)
+                        original_name = viz_file.name.replace("_ocr_overlay.png", ".png")
+                        
+                        # Find the original image in dataset
+                        dataset_root = Path(__file__).parent / "data"
+                        original_img_path = None
+                        
+                        # Search for the original image in dataset
+                        for img_path in dataset_root.rglob(original_name):
+                            if img_path.is_file() and img_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                                original_img_path = img_path
+                                break
+                        
+                        if original_img_path:
+                            dest_path = original_imgs_dst / original_name
+                            shutil.copy2(original_img_path, dest_path)
+                    
+                    original_count = len(list(original_imgs_dst.glob("*.png")))
+                    viz_count = len(list(viz_src.glob("*_ocr_overlay.png")))
+                    click.echo(f"   ✅ Original images synchronized: {original_count}/{viz_count} images copied to docs/demos/task-1/original_images/")
+                
+                # Update the main task-1 index.html with latest report link
+                index_path = docs_task1_dir / "index.html"
+                if index_path.exists():
+                    # Find the most recent HTML report
+                    html_reports = list(docs_task1_dir.glob("ocr_processing_report_*.html"))
+                    if html_reports:
+                        latest_report = max(html_reports, key=lambda p: p.stat().st_mtime)
+                        click.echo(f"   ✅ Latest report identified: {latest_report.name}")
+                        
+                        # Update index.html to point to latest report (basic replacement)
+                        with open(index_path, 'r') as f:
+                            content = f.read()
+                        
+                        # Replace old report references with new one
+                        import re
+                        content = re.sub(
+                            r'ocr_processing_report_\d{8}_\d{6}\.html',
+                            latest_report.name,
+                            content
+                        )
+                        
+                        with open(index_path, 'w') as f:
+                            f.write(content)
+                        click.echo(f"   ✅ Task-1 index.html updated with latest report link")
+                        
+                        # Also update main home page index.html
+                        main_index_path = docs_dir / "index.html"
+                        if main_index_path.exists():
+                            with open(main_index_path, 'r') as f:
+                                main_content = f.read()
+                            
+                            # Replace latest report link in home page
+                            main_content = re.sub(
+                                r'demos/task-1/ocr_processing_report_\d{8}_\d{6}\.html',
+                                f'demos/task-1/{latest_report.name}',
+                                main_content
+                            )
+                            
+                            with open(main_index_path, 'w') as f:
+                                f.write(main_content)
+                            click.echo(f"   ✅ Home page index.html updated with latest report link")
+            
+            click.echo(f"🌐 GitHub Pages updated! Changes will be live at:")
+            click.echo(f"   https://bot-nenb.github.io/ocr-research/demos/task-1/")
+            
+        except Exception as e:
+            click.echo(f"⚠️  Warning: Failed to update GitHub Pages: {e}")
+            logging.warning(f"Failed to copy results to docs directory: {e}")
         
         click.echo(f"\n🏁 Demo completed successfully!")
         click.echo(f"   Results saved to: {output_path}")

@@ -1,1 +1,0 @@
-Now implement the fixes in FIX_IMPLEMENTATION_PLAN.md EXCEPT FOR i) Replace Threading with Multiprocessing and ii) Implement Device-Specific Worker Classes.

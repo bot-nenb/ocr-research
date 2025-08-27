@@ -408,7 +408,8 @@ class ReportGenerator:
                            plot_paths: Dict = None,
                            visual_comparison_data: Dict = None,
                            ground_truth_data: Dict = None,
-                           report_name: str = None) -> str:
+                           report_name: str = None,
+                           model_name: str = None) -> str:
         """
         Generate comprehensive HTML report.
         
@@ -421,13 +422,18 @@ class ReportGenerator:
             visual_comparison_data: Visual comparison data
             ground_truth_data: Ground truth text data
             report_name: Optional report name
+            model_name: Optional OCR model name for report prefixing
             
         Returns:
             Path to generated HTML report
         """
         if report_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_name = f"ocr_processing_report_{timestamp}"
+            # Add model prefix if provided
+            if model_name:
+                report_name = f"{model_name.lower()}_ocr_processing_report_{timestamp}"
+            else:
+                report_name = f"ocr_processing_report_{timestamp}"
         
         # Prepare data for template
         successful_results = [r for r in batch_results if r.success]
@@ -436,6 +442,7 @@ class ReportGenerator:
         template_data = {
             'report_title': 'OCR Batch Processing Report',
             'generated_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'model_name': model_name.upper() if model_name else 'OCR',
             'summary': {
                 'total_documents': len(batch_results),
                 'successful': len(successful_results),
@@ -509,6 +516,34 @@ class ReportGenerator:
         .metric-label {
             color: #666;
             font-size: 0.9em;
+        }
+        .metrics-explanation {
+            background: #f8f9fb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4285f4;
+        }
+        .metrics-explanation h3 {
+            color: #4285f4;
+            margin-bottom: 10px;
+        }
+        .metrics-explanation p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .metric-definitions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .metric-definition {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #e8f0fe;
+            font-size: 0.9em;
+            line-height: 1.4;
         }
         .plot-container {
             text-align: center;
@@ -732,6 +767,26 @@ class ReportGenerator:
     {% if evaluation_metrics %}
     <div class="section">
         <h2>🎯 Accuracy Analysis</h2>
+        
+        <div class="metrics-explanation">
+            <h3>📊 Understanding OCR Accuracy Metrics</h3>
+            <p>These metrics help evaluate how well the OCR system performed compared to ground truth text:</p>
+            <div class="metric-definitions">
+                <div class="metric-definition">
+                    <strong>Word Accuracy:</strong> Percentage of words that were recognized correctly (exact matches). Higher values are better.
+                </div>
+                <div class="metric-definition">
+                    <strong>Character Accuracy:</strong> Percentage of individual characters that were recognized correctly. Higher values are better.
+                </div>
+                <div class="metric-definition">
+                    <strong>WER (Word Error Rate):</strong> Ratio of word-level errors (insertions, deletions, substitutions) to total ground truth words. Lower values are better (0.0 = perfect).
+                </div>
+                <div class="metric-definition">
+                    <strong>CER (Character Error Rate):</strong> Ratio of character-level errors to total ground truth characters. Lower values are better (0.0 = perfect).
+                </div>
+            </div>
+        </div>
+        
         <div class="metric-grid">
             <div class="metric-card">
                 <div class="metric-value">{{ "%.1f"|format(evaluation_metrics.word_accuracy.mean * 100) }}%</div>
@@ -763,6 +818,19 @@ class ReportGenerator:
     {% if cost_analysis %}
     <div class="section">
         <h2>💰 Cost Analysis</h2>
+        
+        <div class="warning-note">
+            <h4>⚠️ Important Note</h4>
+            <p><strong>These cost calculations are estimates</strong> based on hardware depreciation, electricity rates, and cloud service pricing at the time of analysis. Actual costs may vary significantly based on:</p>
+            <ul>
+                <li>Current hardware prices and availability</li>
+                <li>Regional electricity rates and usage patterns</li>
+                <li>Cloud service pricing changes and volume discounts</li>
+                <li>System utilization rates and scaling factors</li>
+                <li>Additional operational costs (maintenance, support, etc.)</li>
+            </ul>
+            <p>Use these estimates for <strong>relative comparison purposes</strong> rather than absolute cost projections.</p>
+        </div>
         
         {% set local_cost = cost_analysis.local_costs.total_local_cost %}
         {% set avg_savings = cost_analysis.cost_comparison.local_vs_average_cloud.savings %}
@@ -879,6 +947,17 @@ class ReportGenerator:
             <!-- Text Comparison Tab -->
             {% if ground_truth_available %}
             <div id="text-tab" class="tab-content" style="display: none;">
+                <div class="warning-note">
+                    <h4>⚠️ Text Comparison Limitations</h4>
+                    <p><strong>Visual highlighting may not always be accurate.</strong> The diff algorithm has known limitations:</p>
+                    <ul>
+                        <li><strong>Identical words may appear red/green:</strong> When the same word appears in different positions, it may be incorrectly marked as "deleted" (red) and "inserted" (green)</li>
+                        <li><strong>Word reordering issues:</strong> The algorithm prioritizes sequential matches, which can misalign words that were simply reordered</li>
+                        <li><strong>Complex text restructuring:</strong> Major sentence restructuring may produce confusing highlighting patterns</li>
+                    </ul>
+                    <p>For accurate OCR evaluation, rely on the <strong>numerical metrics</strong> (Word Accuracy, Character Accuracy, WER, CER) in the Accuracy Analysis section above.</p>
+                </div>
+                
                 <div id="text-diff-content">
                     <!-- Text diff content will be loaded here -->
                 </div>
@@ -981,7 +1060,8 @@ class ReportGenerator:
     
     def generate_csv_summary(self, batch_results: List,
                            evaluation_results: List,
-                           output_path: str = None) -> str:
+                           output_path: str = None,
+                           model_name: str = None) -> str:
         """
         Generate CSV summary of results.
         
@@ -989,13 +1069,18 @@ class ReportGenerator:
             batch_results: Batch processing results
             evaluation_results: Evaluation results
             output_path: Optional output path
+            model_name: Optional OCR model name for file prefixing
             
         Returns:
             Path to generated CSV file
         """
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = self.output_dir / f"results_summary_{timestamp}.csv"
+            # Add model prefix if provided
+            if model_name:
+                output_path = self.output_dir / f"{model_name.lower()}_results_summary_{timestamp}.csv"
+            else:
+                output_path = self.output_dir / f"results_summary_{timestamp}.csv"
         else:
             output_path = Path(output_path)
         
